@@ -5,8 +5,11 @@ from PyQt6.QtWidgets import (
     QCheckBox)
 from PyQt6.QtGui import QPalette, QColor
 from PyQt6.QtCore import Qt
+import requests
 
-URL = "https://cards.scryfall.io/border_crop/front/4/5/4520cdcc-a10f-4b39-9c6f-ba86f6aa2c87.jpg?1689998306"
+URL = f"https://api.scryfall.com/cards/search?"
+
+# URL = "https://cards.scryfall.io/border_crop/front/4/5/4520cdcc-a10f-4b39-9c6f-ba86f6aa2c87.jpg?1689998306"
 
 # imageLabel = QLabel()
         # response = requests.get(URL).content
@@ -23,11 +26,6 @@ class Filters(QWidget):
         self.name_input.setStyleSheet("color: white;")
         self.name_input.setPlaceholderText("Enter card name...")
 
-        #This allows the user to enter a price for the card they would like to see
-        self.price_input = QLineEdit()
-        self.price_input.setStyleSheet("color: white;")
-        self.price_input.setPlaceholderText("Enter the price of a card in $... (ex. 1.25)")
-
         #This allows the user to enter in the ability of the card they would like
         self.ability_input = QLineEdit()
         self.ability_input.setStyleSheet("color: white;")
@@ -41,7 +39,7 @@ class Filters(QWidget):
         #This is the full setup for a checkbox allowing the user to select which colors of card they will see
         self.color_checkboxes = {}
         color_layout = QHBoxLayout()
-        colors = ["Red", "White", "Blue", "Green", "Black"]
+        colors = ["red", "white", "blue", "green", "black", "colorless"]
 
         #This go's through the colors in the colors list and creates a checkbox for them
         #The checkboxes get added to our layout which is the checkbox list itself
@@ -71,7 +69,6 @@ class Filters(QWidget):
         layout.addRow("Rarity:", self.rarity)
         layout.addRow("Type:", self.card_type)
         layout.addRow("Ability:", self.ability_input)
-        layout.addRow("Price:", self.price_input)
 
         #This creates the main layout which is a vertical layout it adds the 
         main_layout = QVBoxLayout()
@@ -81,16 +78,32 @@ class Filters(QWidget):
         #This just makes the widgets layout the main layout
         self.setLayout(main_layout)
 
-    #This prints all the options selected or typed by the user
+    #This prints the query for the get request the options selected or typed by the user
     def submit(self):
-        print(self.name_input.text())
-        selected_colors = [color for color, checkbox in self.color_checkboxes.items() if checkbox.isChecked()]
-        print(selected_colors)
-        print(self.mana_input.text())
-        print(self.rarity.currentText())
-        print(self.card_type.currentText())
-        print(self.ability_input.text())
-        print(self.price_input.text())
+        question = ""
+        if self.name_input.text() != "":
+            question += f"name={self.name_input.text()} "
+
+        color_map = {"white": "w", "blue": "u", "black": "b", "red": "r", "green": "g", "colorless": "c"}
+        selected_colors = [color_map[color] for color, checkbox in self.color_checkboxes.items() if checkbox.isChecked()]
+        if selected_colors != []:
+            question += f"c={selected_colors} "
+
+        if self.mana_input.text() != "":
+            question += f"cmc={self.mana_input.text()} "
+
+        if self.rarity.currentText() != "Any":
+            question += f"rarity={self.rarity.currentText()} "
+
+        if self.card_type.currentText() != "Any":
+            question += f"type={self.card_type.currentText()} "
+
+        if self.ability_input.text() != "":
+            question += f"oracle={self.ability_input.text()} "
+        
+        parameters = {"q": question}
+        response = requests.get(url=URL, params=parameters)
+        print(response.json())
 
 #This simply creates a main window allowing our widget to be viewed
 class MainWindow(QMainWindow):
