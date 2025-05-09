@@ -6,6 +6,9 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QPalette, QColor
 from PyQt6.QtCore import Qt
 import requests
+from rich.console import Console
+from rich.table import Table
+
 
 URL = f"https://api.scryfall.com/cards/search?"
 
@@ -102,8 +105,38 @@ class Filters(QWidget):
             question += f"oracle={self.ability_input.text()} "
         
         parameters = {"q": question}
-        response = requests.get(url=URL, params=parameters)
-        print(response.json())
+        response = requests.get(url=URL, params=parameters).json()
+        console = Console()
+        count = 0
+
+        for card in response["data"]:
+            count += 1
+            console.print(f"\n[bold green]Card {count}: {card['name']}[/bold green]")
+
+            table = Table(title=f"Information about {card['name']}")
+            table.add_column("Field", justify="left", style="cyan", no_wrap=True)
+            table.add_column("Value", justify="left", style="magenta")
+
+            # Safely add each field, using .get() to avoid KeyError
+            table.add_row("Name", card.get("name", "N/A"))
+
+            colors = card.get("colors", [])
+            table.add_row("Colors", ", ".join(colors) if colors else "Colorless")
+
+            table.add_row("Rarity", card.get("rarity", "N/A"))
+            table.add_row("Type", card.get("type_line", "N/A"))
+            table.add_row("Skill", card.get("oracle_text", "N/A"))
+
+            if "power" in card and "toughness" in card:
+                table.add_row("Power/Toughness", f"{card['power']}/{card['toughness']}")
+
+            image_url = card.get("image_uris", {}).get("border_crop")
+            if image_url:
+                table.add_row("Image", image_url)
+
+            console.print(table)
+
+        
 
 #This simply creates a main window allowing our widget to be viewed
 class MainWindow(QMainWindow):
