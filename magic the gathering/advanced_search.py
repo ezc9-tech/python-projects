@@ -84,6 +84,25 @@ class Filters(QWidget):
         # Lastly add the widget to the main layout
         main_layout.addWidget(self.results_area)
 
+        #This adds pagination buttons like next and previous
+        self.nextPageURL = None
+        self.prevPages = []
+
+        #Here are all the buttons
+        paginationLayout = QHBoxLayout()
+        self.prevButton = QPushButton("Previous")
+        self.nextButton = QPushButton("Next")
+        self.prevButton.clicked.connect(self.loadPreviousPage)
+        self.nextButton.clicked.connect(self.loadNextPage)
+        self.prevButton.setEnabled(True)
+        self.nextButton.setEnabled(True)
+        paginationLayout.addWidget(self.prevButton)
+        paginationLayout.addWidget(self.nextButton)
+
+
+        #Add the pagnation layout to the main layout
+        main_layout.addLayout(paginationLayout)
+
         # This just makes the widgets layout the main layout
         self.setLayout(main_layout)
 
@@ -108,7 +127,7 @@ class Filters(QWidget):
                 img_data = requests.get(image_url).content
                 pixmap = QPixmap()
                 pixmap.loadFromData(img_data)
-                image_label.setPixmap(pixmap.scaled(223, 310, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+                image_label.setPixmap(pixmap.scaled(240, 340, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
 
             # If that fails then just display that it failed to load the image
             except Exception as e:
@@ -139,6 +158,9 @@ class Filters(QWidget):
     # This prints the query for the get request using the options selected or typed by the user
     def submit(self):
 
+        self.firstIndex = 0
+        self.lastIndex = 10
+
         # ✅ Clear previous results before making a new query
         for i in reversed(range(self.results_layout.count())):
             widget = self.results_layout.itemAt(i).widget()
@@ -149,8 +171,8 @@ class Filters(QWidget):
         question = ""
 
         # If the name_input isn't empty then add it to the question
-        if self.name_input.text() != "":
-            question += f'name:"{self.name_input.text()}" '
+        if self.name_input.text().strip() != "":
+            question += f'name:"{self.name_input.text().strip()}" '
 
         # Go through the color map and make a dictionary so that we can have the input in the correct format
         color_map = {"white": "w", "blue": "u", "black": "b", "red": "r", "green": "g", "colorless": "c"}
@@ -163,8 +185,8 @@ class Filters(QWidget):
             question += f"c:{''.join(selected_colors)} "
 
         # If the mana input is not empty add it to the question
-        if self.mana_input.text() != "":
-            question += f"cmc={self.mana_input.text()} "
+        if self.mana_input.text().strip() != "":
+            question += f"cmc={self.mana_input.text().strip()} "
 
         # If the rarity input is not "Any" add it to the question
         if self.rarity.currentText() != "Any":
@@ -175,32 +197,72 @@ class Filters(QWidget):
             question += f"type:{self.card_type.currentText().lower()} "
 
         # If the ability input is not empty add it to the question
-        if self.ability_input.text() != "":
-            question += f'oracle:"{self.ability_input.text()}" '
+        if self.ability_input.text().strip() != "":
+            question += f'oracle:"{self.ability_input.text().strip()}" '
 
         # This makes parameters with our query as 'q' due to that being what the API needs for a response
-        parameters = {"q": question}
+        parameters = {"q": question, 
+                      "order": "name",
+                      "unique": "cards",
+                      "page": 1}
 
         # Then we make a get request to the API making sure to pass the parameters and putting the response in JSON form
         try:
             response = requests.get(url=URL, params=parameters)
             response.raise_for_status()
-            data = response.json()
+            self.data = response.json()
         
         except Exception as e:
             error_label = QLabel(f"Error: {str(e)}")
             self.results_layout.addWidget(error_label)
             return
 
-        # Display the first 20 cards returned from the API
-        for card in data.get("data", [])[:20]:
-            self.displayCard(card)        
+        # Display the first 10 cards returned from the API
+        for card in self.data.get("data", [])[self.firstIndex:self.lastIndex]:
+            self.displayCard(card)
+
+    #This will load in the next page if the next button is pushed
+    def loadNextPage(self):
+    
+        #increase the indexes for the page
+        self.firstIndex += 10
+        self.lastIndex += 10
+
+        # Clear previous results
+        for i in reversed(range(self.results_layout.count())):
+            widget = self.results_layout.itemAt(i).widget()
+            if widget is not None:
+                widget.deleteLater()
+
+        #Display each card in the data
+        for card in self.data.get("data", [])[self.firstIndex:self.lastIndex]:
+            self.displayCard(card)
+
+    def loadPreviousPage(self):
+        if self.firstIndex - 10 < 0:
+            return
+
+        #increase the indexes for the page
+        self.firstIndex -= 10
+        self.lastIndex -= 10
+
+        # Clear previous results
+        for i in reversed(range(self.results_layout.count())):
+            widget = self.results_layout.itemAt(i).widget()
+            if widget is not None:
+                widget.deleteLater()
+
+        #Display each card in the data
+        for card in self.data.get("data", [])[self.firstIndex:self.lastIndex]:
+            self.displayCard(card)
+
+
 
 # This simply creates a main window allowing our widget to be viewed
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Custom Widget Example")
+        self.setWindowTitle("Magic The Gathering Card Finder")
         self.setGeometry(100, 100, 500, 100)
         self.custom_widget = Filters()
         self.setCentralWidget(self.custom_widget)
